@@ -1,3 +1,5 @@
+import math
+
 from PyQt5.QtWidgets import QWidget, QApplication
 from PyQt5.QtGui import QPainter, QPen, QPolygon, QBrush, QFont
 from PyQt5.QtCore import Qt, QPoint, QRect
@@ -35,7 +37,7 @@ class FirstTask(QWidget):
 
     def coords_to_screen_point(self, x, y):
         return round((x - self.start) * self.geometry().width() / (self.end - self.start)), \
-               round((y - self.ymax) * self.geometry().height() / (self.ymin - self.ymax)) - 30
+               round((y - self.ymax) * self.geometry().height() / (self.ymin - self.ymax))
 
     def screen_point_to_coords(self, x, y):
         return x * (self.end - self.start) / self.geometry().width() + self.start, \
@@ -98,7 +100,7 @@ class FirstTask(QWidget):
 
 
 def foo(x):
-    return x ** 2 - 10
+    return math.sin(x)*x**2
 
 
 if __name__ == '__main__':
