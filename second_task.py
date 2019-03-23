@@ -1,13 +1,9 @@
 import itertools
 import math
-
 from PyQt5.QtWidgets import QWidget, QApplication
 from PyQt5.QtGui import QPainter, QPen, QPolygon, QBrush, QFont
 from PyQt5.QtCore import Qt, QPoint, QRect
 import sys
-
-from sympy.solvers import solve
-from sympy import Symbol, re
 
 
 class FirstTask(QWidget):
@@ -23,11 +19,11 @@ class FirstTask(QWidget):
         self.function_upper_bound = 1000
         self.function_lower_bound = -1000
 
-        self.ymax = 5  # TODO
-        self.ymin = -5  # TODO
+        self.ymax = 6
+        self.ymin = -1
 
-        self.start = -5
-        self.end = 2
+        self.start = -6
+        self.end = 1
 
         self.focus = self.pf.from_substituted(0, self.b + 1 / (4 * self.a))
         self.vertex = self.pf.from_substituted(0, self.function(0))
@@ -37,7 +33,6 @@ class FirstTask(QWidget):
         print('focus:', self.focus)
         print('vertex:', self.vertex)
         print('directrix:', self.directrix_zero)
-        print(self.pf.from_cartesian(0, 0))
 
         self.directrix_zero = self.pf.from_substituted(0, self.b - 1 / (4 * self.a))
         self.directrix_b = self.directrix_zero.y - self.directrix_zero.x  # смещение уравнения прямой директрисы
@@ -54,11 +49,9 @@ class FirstTask(QWidget):
     def paintEvent(self, e):
         qp = QPainter()
         qp.begin(self)
-        # self.find_function_min_and_max()
         self.draw_axes(qp)
         self.draw_function(qp)
         self.draw_parabola_helpers(qp)
-        # self.draw_function_old(qp)
         qp.end()
 
     def draw_parabola_helpers(self, qp):
@@ -77,10 +70,8 @@ class FirstTask(QWidget):
                     *self.pf.from_cartesian(self.ymax - self.directrix_b, self.ymax).screen())
 
     def error_size(self, u, v):
-        # distance_to_disectrix = abs(u + v + self.directrix_b) / (math.sqrt(2))
         distance_to_disectrix = abs(v + 1 / (4 * self.a) - self.b)
         distance_to_focus = math.sqrt((self.focus.u - u) ** 2 + (self.focus.v - v) ** 2)
-        # print(abs(distance_to_disectrix - distance_to_focus))
         return abs(distance_to_disectrix - distance_to_focus)
 
     def get_best_point(self, old_point):
@@ -156,24 +147,6 @@ class FirstTask(QWidget):
     def function(self, u):
         return self.a * u ** 2 + self.b
 
-    def draw_function_old(self, qp):
-        qp.setPen(QPen(Qt.blue, 1, Qt.SolidLine))
-        prev_point = QPoint(*self.coords_to_screen_point(self.start, foo2(self.start)))
-        for xx in range(1, self.geometry().width()):
-            x, _ = self.screen_point_to_coords(xx, 0)
-            _, yy = self.coords_to_screen_point(0, foo2(x))
-            new_point = QPoint(xx, yy)
-            qp.drawLine(prev_point, new_point)
-            prev_point = new_point
-
-
-y_symbol = Symbol('y')
-
-
-def foo2(x):
-    result = solve((x + y_symbol) ** 2 + 2 - y_symbol, y_symbol)[0]
-    return float(re(result))
-
 
 class PointFactory:
     def __init__(self, base):
@@ -234,13 +207,9 @@ class Point:
                 result.append(point)
             if not self.fits_on_screen(point):
                 break
-
         else:
             return result
         return []
-        # return list(filter(lambda point: self.fits_on_screen(point) and point not in self.base.visited_points,
-        #                [self.base.pf.from_screen(move[0] + self.xx, move[1] + self.yy) for move in
-        #                 connected_moves]))
 
     def fits_on_screen(self, point):
         return 0 <= point.xx < self.base.geometry().width() and 0 <= point.yy < self.base.geometry().height()
@@ -254,19 +223,9 @@ class Point:
     def substituted(self):
         return self.u, self.v
 
-    # def _cartesian_to_screen(self, x, y):
-    #     return round(
-    #         (x - self.base.function_bounds.x()) * self.base.geometry().width() / (
-    #             self.base.function_bounds.width())), round(
-    #         (y - self.base.function_bounds.y()) * self.base.geometry().height() / (self.base.function_bounds.height()))
-
     def _screen_to_cartesian(self, x, y):
         return x * (self.base.end - self.base.start) / self.base.geometry().width() + self.base.start, \
                y * (self.base.ymin - self.base.ymax) / self.base.geometry().height() + self.base.ymax
-
-    #
-    # def _cartesian_to_substituted(self, x, y):
-    #     return x + y, y
 
     def _substituted_to_cartesian(self, u, v):
         return u - v, v
@@ -275,7 +234,7 @@ class Point:
         return self.xx == o.xx and self.yy == o.yy
 
     def __str__(self):
-        return str(f"screen: {self.xx}, {self.yy} cartesian: {self.x}, {self.y} substituted: {self.u}, {self.v}")
+        return str(f"screen: ({self.xx}, {self.yy}) cartesian: ({self.x}, {self.y}) substituted: ({self.u}, {self.v})")
 
 
 if __name__ == '__main__':
