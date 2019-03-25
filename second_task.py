@@ -40,7 +40,7 @@ class FirstTask(QWidget):
         self.init_ui()
 
     def init_ui(self):
-        self.setWindowTitle('First task')
+        self.setWindowTitle('Second task')
         p = self.palette()
         p.setColor(self.backgroundRole(), Qt.white)
         self.setPalette(p)
@@ -97,16 +97,6 @@ class FirstTask(QWidget):
                 break
             qp.drawPoint(*new_point.screen())
             self.visited_points.append(new_point)
-
-    def find_function_min_and_max(self):
-        ymin = ymax = self.function(self.start)
-        for xx in range(self.geometry().width()):
-            x = xx * (self.end - self.start) / self.geometry().width() + self.start
-            y = self.function(x)
-            ymin = min(ymin, y)
-            ymax = max(ymax, y)
-        self.ymin = max(self.function_lower_bound, round(ymin))
-        self.ymax = min(self.function_upper_bound, round(ymax))
 
     def draw_axes(self, qp):
         qp.setPen(QPen(Qt.black, 1, Qt.SolidLine))
