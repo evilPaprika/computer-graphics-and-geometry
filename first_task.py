@@ -56,7 +56,7 @@ class FirstTask(QWidget):
     def find_function_min_and_max(self):
         ymin = ymax = self.function(self.start)
         for xx in range(self.geometry().width()):
-            x = self.screen_to_cartesian(xx, 0)[0]
+            x = xx * (self.end - self.start) / self.geometry().width() + self.start
             y = self.function(x)
             ymin = min(ymin, y)
             ymax = max(ymax, y)
