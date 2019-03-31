@@ -1,7 +1,7 @@
 import math
 
 from PyQt5.QtWidgets import QWidget, QApplication
-from PyQt5.QtGui import QPainter, QPen, QPolygon, QBrush, QFont
+from PyQt5.QtGui import QPainter, QPen, QPolygon, QBrush, QFont, QPainterPath
 from PyQt5.QtCore import Qt, QPoint, QRect
 import sys
 
@@ -43,6 +43,26 @@ class FirstTask(QWidget):
         return xx * (self.end - self.start) / self.geometry().width() + self.start, \
                yy * (self.ymin - self.ymax) / self.geometry().height() + self.ymax
 
+    def draw_function(self, qp):
+        qp.setPen(QPen(Qt.blue, 1, Qt.SolidLine))
+        path = QPainterPath(QPoint(*self.cartesian_to_screen(self.start, self.function(self.start))))
+        for xx in range(1, self.geometry().width()):
+            x, _ = self.screen_to_cartesian(xx, 0)
+            _, yy = self.cartesian_to_screen(0, self.function(x))
+            path.lineTo(QPoint(xx, yy))
+            path.moveTo(QPoint(xx, yy))
+        qp.drawPath(path)
+
+    def find_function_min_and_max(self):
+        ymin = ymax = self.function(self.start)
+        for xx in range(self.geometry().width()):
+            x = self.screen_to_cartesian(xx, 0)[0]
+            y = self.function(x)
+            ymin = min(ymin, y)
+            ymax = max(ymax, y)
+        self.ymin = max(self.function_lower_bound, round(ymin))
+        self.ymax = min(self.function_upper_bound, round(ymax))
+
     def draw_axes(self, qp):
         qp.setPen(QPen(Qt.black, 1, Qt.SolidLine))
         xx0, yy0 = self.cartesian_to_screen(0, 0)
@@ -78,29 +98,9 @@ class FirstTask(QWidget):
                                  QPoint(xx0 + 3, 0 + 8),
                                  QPoint(xx0, 0)]))
 
-    def draw_function(self, qp):
-        qp.setPen(QPen(Qt.blue, 1, Qt.SolidLine))
-        prev_point = QPoint(*self.cartesian_to_screen(self.start, self.function(self.start)))
-        for xx in range(1, self.geometry().width()):
-            x, _ = self.screen_to_cartesian(xx, 0)
-            _, yy = self.cartesian_to_screen(0, self.function(x))
-            new_point = QPoint(xx, yy)
-            qp.drawLine(prev_point, new_point)
-            prev_point = new_point
-
-    def find_function_min_and_max(self):
-        ymin = ymax = self.function(self.start)
-        for xx in range(self.geometry().width()):
-            x = xx * (self.end - self.start) / self.geometry().width() + self.start
-            y = self.function(x)
-            ymin = min(ymin, y)
-            ymax = max(ymax, y)
-        self.ymin = max(self.function_lower_bound, round(ymin))
-        self.ymax = min(self.function_upper_bound, round(ymax))
-
 
 def foo(x):
-    return math.sin(x)*x**2
+    return math.sin(x) * x ** 2
 
 
 if __name__ == '__main__':
