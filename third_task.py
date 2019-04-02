@@ -16,7 +16,7 @@ class FirstTask(QWidget):
         self.setGeometry(100, 100, 600, 600)
 
         self.polygon_is_build = False
-        self.polygon = [QPoint(100, 100), QPoint(150, 100), QPoint(200, 80), QPoint(250, 100), QPoint(300, 100)]
+        self.polygon = []
         self.polygon_shards = []
         self.concave_vertices = []
 
