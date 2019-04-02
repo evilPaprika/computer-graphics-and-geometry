@@ -16,7 +16,7 @@ class FirstTask(QWidget):
         self.setGeometry(100, 100, 600, 600)
 
         self.polygon_is_build = False
-        self.polygon = []
+        self.polygon = [QPoint(100, 100), QPoint(150, 100), QPoint(200, 80), QPoint(250, 100), QPoint(300, 100)]
         self.polygon_shards = []
         self.concave_vertices = []
 
@@ -45,7 +45,7 @@ class FirstTask(QWidget):
         qp.begin(self)
         qp.setPen(QPen(Qt.blue, 3, Qt.SolidLine))
 
-        self.paint_polygon(qp, self.polygon)
+        
         if self.polygon_is_build:
             self.polygon_shards = self.split_polygon(self.polygon, qp)
 
@@ -54,16 +54,15 @@ class FirstTask(QWidget):
             qp.setPen(QPen(Qt.red, 3, Qt.SolidLine))
             for vertex in self.concave_vertices:
                 qp.drawPoint(vertex)
-
+        else:
+            self.paint_polygon(qp, self.polygon)
         qp.end()
 
     def split_polygon(self, polygon, qp):
-        # self.concave_vertices = self.find_concave_vertices(polygon)
         concave_vertex = self.find_concave_vertex(polygon)
         if not concave_vertex:
             return [polygon]
         edges = [QLine(*(polygon + polygon)[i:i + 2]) for i in range(0, len(polygon), 1)]
-        print(polygon)
         self.concave_vertices.append(concave_vertex)
         i = polygon.index(concave_vertex)
 
@@ -106,23 +105,13 @@ class FirstTask(QWidget):
                     polygon[i - 1].y() - polygon[i - 2].y()) < 0:
                 return polygon[i - 1]
 
-    def find_concave_vertices(self, polygon):
-        print(self.area_by_shoelace(polygon))
-        if self.area_by_shoelace(polygon) < 0:
-            polygon = polygon[::-1]
-        concave_vertices = []
-        for i in range(0, len(polygon)):
-            if (polygon[i - 1].x() - polygon[i - 2].x()) * (polygon[i].y() - polygon[i - 1].y()) - (
-                    polygon[i].x() - polygon[i - 1].x()) * (
-                    polygon[i - 1].y() - polygon[i - 2].y()) < 0:
-                concave_vertices.append(polygon[i - 1])
-        return concave_vertices
-
     def find_closest_intersection(self, p0: QPoint, p1: QPoint, edges):
         min_intersection, split_edge = None, None
         min_length = None
         for edge in edges:
             intersection = self.get_line_intersection(p0, p1, edge.p1(), edge.p2())
+            if intersection == p0 or intersection == p1:
+                continue
             if intersection and not min_intersection:
                 min_intersection, split_edge = intersection, edge
                 min_length = (p1 - intersection).manhattanLength()
@@ -141,14 +130,12 @@ class FirstTask(QWidget):
             s = (-s1.y() * (p0.x() - p2.x()) + s1.x() * (p0.y() - p2.y())) / (-s2.x() * s1.y() + s1.x() * s2.y())
             t = (s2.x() * (p0.y() - p2.y()) - s2.y() * (p0.x() - p2.x())) / (-s2.x() * s1.y() + s1.x() * s2.y())
 
-            if 0 < s < 1 and t > 0:
+            if 0 <= s <= 1 and t > 0:
                 intersection = QPoint(p0.x() + (t * s1.x()), p0.y() + (t * s1.y()))
-                # print(intersection)
                 return intersection
         except ZeroDivisionError:
             pass
 
-        # print(None)
         return None
 
     def area_by_shoelace(self, polygon):
