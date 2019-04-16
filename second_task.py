@@ -6,7 +6,7 @@ from PyQt5.QtCore import Qt, QPoint, QRect
 import sys
 
 
-class FirstTask(QWidget):
+class SecondTask(QWidget):
     def __init__(self):
         super().__init__()
         self.setGeometry(100, 100, 600, 600)
@@ -229,5 +229,5 @@ class Point:
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
-    ex = FirstTask()
+    ex = SecondTask()
     sys.exit(app.exec_())

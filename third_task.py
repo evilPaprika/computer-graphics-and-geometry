@@ -8,7 +8,7 @@ from PyQt5.QtCore import Qt, QPoint, QRect, QLine
 import sys
 
 
-class FirstTask(QWidget):
+class ThirdTask(QWidget):
     polygon: List[QPoint]
 
     def __init__(self):
@@ -159,5 +159,5 @@ class FirstTask(QWidget):
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
-    ex = FirstTask()
+    ex = ThirdTask()
     sys.exit(app.exec_())
