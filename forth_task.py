@@ -12,10 +12,10 @@ class ForthTask(QWidget):
         super().__init__()
         self.setGeometry(100, 100, 600, 600)
 
-        self.x1 = -4
-        self.x2 = 4
-        self.y1 = -4
-        self.y2 = 4
+        self.x1 = -2
+        self.x2 = 2
+        self.y1 = -2
+        self.y2 = 2
         self.top = []
         self.bottom = []
         self.rotation_angle = 0
@@ -131,7 +131,10 @@ class ForthTask(QWidget):
         return minx, maxx, miny, maxy
 
     def function(self, x, y):
-        return math.cos(x * y)
+        return x*y**3-y*x**3
+        # return math.cos(x + y) + x**2/1 - y**2/1
+        # return math.sin(x**2 + y**2)
+        # return math.cos(x * y)
 
     def rotatate_vector(self, x, y, z):
         alpha = numpy.radians(self.rotation_angle)
