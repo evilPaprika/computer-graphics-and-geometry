@@ -1,6 +1,6 @@
 import math
 import numpy as np
-from itertools import combinations
+from itertools import combinations, chain
 
 from PyQt5.QtWidgets import QWidget, QApplication
 from PyQt5.QtGui import QPainter, QPen, QPolygon, QBrush, QFont, QMouseEvent
@@ -18,10 +18,18 @@ class FifthTask(QWidget):
         self.y1 = -3
         self.y2 = 3
 
-        self.square_ititial = np.array([[2, -1, 0, 0, 0, 0],
-                                        [0, 0, 1, -5, 0, 0],
-                                        [0, 0, 0, 0, 1, -1],
-                                        [5, 1, 1, 1, 1, 1], ])
+        self.square = np.array([[2, -2, 0, 0, 0, 0],
+                                [0, 0, 2, -2, 0, 0],
+                                [0, 0, 0, 0, 1, -1],
+                                [1, 1, 1, 1, 1, 1], ])
+
+        self.square2 = np.array([[1, -1, 0, 0, 0, 0],
+                                 [0, 0, 1, -1, 0, 0],
+                                 [0, 0, 0, 0, 2, -2],
+                                 [1, 1, 1, 1, 1, 1], ])
+
+        self.shapes = [self.square, self.square2]
+
         self.rotation_angle_x = 0
         self.rotation_angle_y = 0
         self.rotation_angle_z = 0
@@ -31,18 +39,19 @@ class FifthTask(QWidget):
 
         self._status_update_timer = QTimer(self)
         self._status_update_timer.timeout.connect(self.rotate)
-        self._status_update_timer.start(10)
+        self._status_update_timer.start(50)
 
     def rotate(self):
-        self.rotation_angle_x += 0.05
+        # self.rotation_angle_x += 0.05
         self.rotation_angle_y += 0.02
-        self.rotation_angle_z += 0.1
-        self.square = self.transform(self.square_ititial)
-        self.square_edges = self.find_shape_lines(self.square)
+        # self.rotation_angle_z += 0.1
+        self.transformed_shapes = map(lambda shape: self.transform(shape), self.shapes)
+        self.lines_to_draw = chain(*map(lambda shape: self.find_shape_edges(shape), self.transformed_shapes))
+
         self.init_ui()
         self.update()
 
-    def find_shape_lines(self, shape):
+    def find_shape_edges(self, shape):
         transposed_shape = shape.transpose().tolist()
         grouped_by_two_planes = combinations(transposed_shape, 2)
         result = []
@@ -53,9 +62,9 @@ class FifthTask(QWidget):
                 p2 = two_planes[1]
                 p3 = third_plane
                 c = 0
-                if np.dot(p1, [0,0,1,0]) < 0: c+=1
-                if np.dot(p2, [0,0,1,0]) < 0: c+=1
-                if np.dot(p3, [0,0,1,0]) < 0: c+=1
+                if np.dot(p1, [0, 0, 1, 0]) <= 0: c += 1
+                if np.dot(p2, [0, 0, 1, 0]) <= 0: c += 1
+                if np.dot(p3, [0, 0, 1, 0]) <= 0: c += 1
                 if c == 3:
                     continue
                 if p1 == p3 or p2 == p3:
@@ -85,9 +94,8 @@ class FifthTask(QWidget):
 
     def draw_shape(self, qp: QPainter):
         qp.setPen(QPen(Qt.blue, 1, Qt.SolidLine))
-        for edge in self.square_edges:
-            qp.drawLine(self.plane_to_screen(edge[0]), self.plane_to_screen(edge[1]))
-        qp.drawPoint(self.homog_to_screen([0, 0, 0, 1]))
+        for line in self.lines_to_draw:
+            qp.drawLine(self.plane_to_screen(line[0]), self.plane_to_screen(line[1]))
 
     def plane_to_screen(self, v):
         xp, yp = self.front_projection(v)
@@ -136,7 +144,7 @@ class FifthTask(QWidget):
     def rotation_z(self, m):
         angle = self.rotation_angle_z
         rot_matrix = np.array([
-            [math.cos(angle),math.sin(angle), 0, 0],
+            [math.cos(angle), math.sin(angle), 0, 0],
             [-math.sin(angle), math.cos(angle), 0, 0],
             [0, 0, 1, 0],
             [0, 0, 0, 1],
