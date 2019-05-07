@@ -1,31 +1,35 @@
 import math
 import numpy as np
-from itertools import combinations, chain
+from itertools import combinations, chain, permutations
 
+from PyQt5 import QtCore
 from PyQt5.QtWidgets import QWidget, QApplication
 from PyQt5.QtGui import QPainter, QPen, QPolygon, QBrush, QFont, QMouseEvent
 from PyQt5.QtCore import Qt, QPoint, QRect, QLine, QTimer
 import sys
 
+np.set_printoptions(precision=1)
+
 
 class FifthTask(QWidget):
+
     def __init__(self):
         super().__init__()
-        self.setGeometry(100, 100, 600, 600)
+        self.setGeometry(100, 100, 800, 800)
 
-        self.x1 = -3
-        self.x2 = 3
-        self.y1 = -3
-        self.y2 = 3
-
-        self.square = np.array([[2, -2, 0, 0, 0, 0],
-                                [0, 0, 2, -2, 0, 0],
-                                [0, 0, 0, 0, 1, -1],
+        self.x1 = -2.5
+        self.x2 = 2.5
+        self.y1 = -2.5
+        self.y2 = 2.5
+        #
+        self.square = np.array([[-2, 2, 0, 0, 0, 0],
+                                [0, 0, -0.5, 2, 0, 0],
+                                [0, 0, 0, 0, -2, 2],
                                 [1, 1, 1, 1, 1, 1], ])
 
         self.square2 = np.array([[1, -1, 0, 0, 0, 0],
                                  [0, 0, 1, -1, 0, 0],
-                                 [0, 0, 0, 0, 2, -2],
+                                 [0, 0, 0, 0, 1, -1],
                                  [1, 1, 1, 1, 1, 1], ])
 
         self.shapes = [self.square, self.square2]
@@ -37,19 +41,115 @@ class FifthTask(QWidget):
 
         self.init_ui()
 
-        self._status_update_timer = QTimer(self)
-        self._status_update_timer.timeout.connect(self.rotate)
-        self._status_update_timer.start(50)
-
     def rotate(self):
-        # self.rotation_angle_x += 0.05
-        self.rotation_angle_y += 0.02
-        # self.rotation_angle_z += 0.1
-        self.transformed_shapes = map(lambda shape: self.transform(shape), self.shapes)
-        self.lines_to_draw = chain(*map(lambda shape: self.find_shape_edges(shape), self.transformed_shapes))
+        self.intersections_with_view_planes = []
+        self.intersections_with_sides = []
+        self.transformed_shapes = list(map(lambda shape: self.transform(shape), self.shapes))
+        self.lines_to_draw = list(chain(*map(lambda shape: self.find_shape_edges(shape), self.transformed_shapes)))
 
-        self.init_ui()
+        self.visible_edges = []
+        for shape in self.transformed_shapes:
+            self.visible_edges.append(self.find_shape_edges(shape))
+
+        for i in range(len(self.transformed_shapes)):
+            for j in range(len(self.transformed_shapes)):
+                if i == j: continue
+                for line1 in self.visible_edges[i]:
+                    for line2 in self.visible_edges[j][:]:
+                        intersection = self.view_plane_line_intercection(line1, line2)
+                        if intersection:
+                            self.intersections_with_view_planes.append(intersection)
+                            self.visible_edges[j].append([line2[0], intersection])
+                            self.visible_edges[j].append([intersection, line2[1]])
+                            self.visible_edges[j].remove(line2)
+
+
+        # print(self.splitted_with_view_edges)
+        # print(self.rotation_angle_x, self.rotation_angle_y, self.rotation_angle_z)
+
+        self.splitted_with_sides = [[] for i in range(len(self.shapes))]
+        for i in range(len(self.transformed_shapes)):
+            for j in range(len(self.transformed_shapes)):
+                if i == j: continue
+                planes = self.transformed_shapes[i].transpose()
+                for plane in planes:
+                    for line in self.visible_edges[j][:]:
+                        intersection = self.isect_line_plane(line[0], line[1], plane)
+                        if intersection is not None:
+                            intersection = intersection.tolist()
+                            dot = np.dot(planes, intersection + [1])
+                            if not any(map(lambda p: p < -0.01, dot)) and intersection not in self.intersections_with_sides:
+                                self.intersections_with_sides.append(intersection)
+                                self.visible_edges[j].append([line[0], intersection])
+                                self.visible_edges[j].append([intersection, line[1]])
+                                self.visible_edges[j].remove(line)
+
+
+        self.lines_to_draw = list(chain(*self.visible_edges))
+        self.lines_to_draw.extend(permutations(self.intersections_with_sides, 2))
+        self.lines_to_draw = filter(lambda line: self.is_line_visible(line), self.lines_to_draw)
+        print(self.is_line_visible([[-1,1,1], [1,1,1]]))
         self.update()
+
+    def is_line_visible(self, line):
+        for shape in self.transformed_shapes:
+            planes = shape.transpose()
+            middle = np.append(self.get_middle_point(line), 1)
+            print(middle)
+            dot = np.dot(planes, middle)
+            if not any(map(lambda p: p < 0.0001, dot)):
+                return False
+        return True
+
+    def isect_line_plane(self, p0, p1, plane, epsilon=1e-6):
+        u = np.array(p1) - np.array(p0)
+        dot = np.dot(plane[:3], u)
+        plane = np.array(plane)
+        if abs(dot) > epsilon:
+            # calculate a point on the plane
+            # (divide can be omitted for unit hessian-normal form).
+            p_co = plane[:3] * -plane[3] / np.dot(plane[:3], plane[:3])
+
+            w = np.array(p0) - np.array(p_co)
+            fac = -np.dot(plane[:3], w) / dot
+            u = u * fac
+            intersection = p0 + u
+            if 0.01 > abs(self.distance(p0, p1) - self.distance(p0, intersection) - self.distance(intersection, p1)):
+                return intersection
+        return None
+
+    def get_middle_point(self, line):
+        A = np.array(line[0])
+        B = np.array(line[1])
+        return ((B - A) /2) + A
+
+
+    def view_plane_line_intercection(self, view_line, line):
+        A = np.array(view_line[0])
+        B = np.array(view_line[1])
+        D = np.array([0, 0, -1])
+        C = np.array(line[1]) - np.array(line[0])
+        matrix = np.array([B - A, D, -C]).transpose()
+
+        right_handside = np.array(np.array(line[0]) - A)
+        try:
+            t, p, s = np.linalg.solve(matrix, right_handside)
+            if (0 <= t <= 1 and p >= 0 and 0 <= s <= 1):
+                new = (np.array(line[0]) + C * s)
+                return new.tolist()
+        except:
+            return None
+
+    def shape_side_line_intersection(self, plane, line):
+        px, py, pz = line[0]
+        qx, qy, qz = line[1]
+        a, b, c, d = plane
+        tDenom = a * (qx - px) + b * (qy - py) + c * (qz - pz)
+        if (tDenom == 0):
+            return None
+        t = - (a * px + b * py + c * pz + d) / tDenom
+
+        return [(px + t * (qx - px)), (py + t * (qy - py)), (pz + t * (qz - pz))]
 
     def find_shape_edges(self, shape):
         transposed_shape = shape.transpose().tolist()
@@ -61,13 +161,13 @@ class FifthTask(QWidget):
                 p1 = two_planes[0]
                 p2 = two_planes[1]
                 p3 = third_plane
-                c = 0
-                if np.dot(p1, [0, 0, 1, 0]) <= 0: c += 1
-                if np.dot(p2, [0, 0, 1, 0]) <= 0: c += 1
-                if np.dot(p3, [0, 0, 1, 0]) <= 0: c += 1
-                if c == 3:
+                if p1 == p3 or p1 == p3 or p2 == p3:
                     continue
-                if p1 == p3 or p2 == p3:
+                c = 0
+                if np.dot(p1, [0, 0, -1, 0]) <= 0: c += 1
+                if np.dot(p2, [0, 0, -1, 0]) <= 0: c += 1
+                if np.dot(p3, [0, 0, -1, 0]) <= 0: c += 1
+                if c == 3:
                     continue
                 try:
                     new_point = np.linalg.solve([p1[:3], p2[:3], p3[:3]], np.array([-p1[3], -p2[3], -p3[3]])).tolist()
@@ -79,6 +179,10 @@ class FifthTask(QWidget):
             if len(line) == 2: result.append(line)
         return result
 
+    def distance(self, point1, point2):
+        p = np.array(point1) - np.array(point2)
+        return math.sqrt(np.dot(p, p))
+
     def init_ui(self):
         self.setWindowTitle('Fifth Task')
         p = self.palette()
@@ -89,6 +193,9 @@ class FifthTask(QWidget):
     def paintEvent(self, e):
         qp = QPainter()
         qp.begin(self)
+        font = QFont()
+        font.setPixelSize(10)
+        qp.setFont(font)
         self.draw_shape(qp)
         qp.end()
 
@@ -96,11 +203,23 @@ class FifthTask(QWidget):
         qp.setPen(QPen(Qt.blue, 1, Qt.SolidLine))
         for line in self.lines_to_draw:
             qp.drawLine(self.plane_to_screen(line[0]), self.plane_to_screen(line[1]))
+            qp.drawText(self.plane_to_screen(line[0]), str(np.array(line[0])))
+            qp.drawText(self.plane_to_screen(line[1]), str(np.array(line[1])))
+
+        qp.setPen(QPen(Qt.red, 3, Qt.SolidLine))
+        for point in self.intersections_with_view_planes:
+            qp.drawPoint(self.plane_to_screen(point))
+            qp.drawText(self.plane_to_screen(point), str(np.array(point)))
+
+        qp.setPen(QPen(Qt.green, 3, Qt.SolidLine))
+        for point in self.intersections_with_sides:
+            qp.drawPoint(self.plane_to_screen(point))
+            qp.drawText(self.plane_to_screen(point), str(np.array(point)))
 
     def plane_to_screen(self, v):
         xp, yp = self.front_projection(v)
         xx = round((xp - self.x1) * self.geometry().width() / (self.x2 - self.x1))
-        yy = round((yp - self.y1) * self.geometry().height() / (self.y2 - self.y1))
+        yy = self.geometry().height() - round((yp - self.y1) * self.geometry().height() / (self.y2 - self.y1))
         return QPoint(xx, yy)
 
     def front_projection(self, v):
@@ -151,6 +270,25 @@ class FifthTask(QWidget):
         ])
 
         return np.dot(np.linalg.inv(rot_matrix), m)
+
+    def keyPressEvent(self, event):
+        if event.key() == QtCore.Qt.Key_S:
+            self.rotation_angle_x += 0.1
+        elif event.key() == QtCore.Qt.Key_W:
+            self.rotation_angle_x -= 0.1
+
+        elif event.key() == QtCore.Qt.Key_D:
+            self.rotation_angle_y += 0.1
+        elif event.key() == QtCore.Qt.Key_A:
+            self.rotation_angle_y -= 0.1
+
+        elif event.key() == QtCore.Qt.Key_Q:
+            self.rotation_angle_z += 0.1
+        elif event.key() == QtCore.Qt.Key_E:
+            self.rotation_angle_z -= 0.1
+        else:
+            return
+        self.rotate()
 
     # def projection(self, x, y, z):
     #     return self.front_projection(x, y, z)
