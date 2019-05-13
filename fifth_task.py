@@ -24,7 +24,7 @@ class FifthTask(QWidget):
 
         self.square = np.array([[-2, 2, 0, 0, 0, 0],
                                 [0, 0, -0.5, 0.5, 0, 0],
-                                [0, 0, 0, 0, -2, 2],
+                                [0, 0, 0, 0, -0.6, 2],
                                 [1, 1, 1, 1, 1, 1], ])
 
         self.square2 = np.array([[1, -1, 0, 0, 0, 0],
@@ -33,8 +33,6 @@ class FifthTask(QWidget):
                                  [1, 1, 1, 1, 1, 1], ])
 
         self.shapes = [self.square, self.square2]
-        self.rotation_angles = [{'x': 0, 'y': 0, 'z': 0} for i in range(len(self.shapes))]
-        self.rotate_indexes = [range(len(self.shapes))]
 
         self.rotation_angle_x = 0.7
         self.rotation_angle_y = -1.2
@@ -46,10 +44,7 @@ class FifthTask(QWidget):
     def rotate(self):
         self.intersections_with_view_planes = []
         self.intersections_with_sides = []
-        print(list(enumerate(self.shapes)))
-        self.transformed_shapes = list(
-            map(lambda i, shape: self.transform(shape) if i in self.rotate_indexes else shape,
-                tuple(enumerate(np.array(self.shapes)))))
+        self.transformed_shapes = list(map(self.transform, self.shapes))
         self.lines_to_draw = list(chain(*map(lambda shape: self.find_shape_edges(shape), self.transformed_shapes)))
 
         self.visible_edges = []
@@ -236,25 +231,25 @@ class FifthTask(QWidget):
 
     def draw_shape(self, qp: QPainter):
         qp.setPen(QPen(Qt.blue, 1, Qt.SolidLine))
-
+        # helpers
         qp.drawText(QPoint(0, 10),
                     'rotaion: ' + str(np.array([self.rotation_angle_x, self.rotation_angle_y, self.rotation_angle_z])))
-        qp.drawText(QPoint(100, 10),
-                    'rotaion: ' + str(np.array(self.rotate_indexes)))
         for line in self.lines_to_draw:
             qp.drawLine(self.plane_to_screen(line[0]), self.plane_to_screen(line[1]))
-            qp.drawText(self.plane_to_screen(line[0]), str(np.array(line[0])))
-            qp.drawText(self.plane_to_screen(line[1]), str(np.array(line[1])))
+            # helpers
+            # qp.drawText(self.plane_to_screen(line[0]), str(np.array(line[0])))
+            # qp.drawText(self.plane_to_screen(line[1]), str(np.array(line[1])))
 
-        qp.setPen(QPen(Qt.red, 3, Qt.SolidLine))
-        for point in self.intersections_with_view_planes:
-            qp.drawPoint(self.plane_to_screen(point))
-            qp.drawText(self.plane_to_screen(point), str(np.array(point)))
+        # # helpers
+        # qp.setPen(QPen(Qt.red, 3, Qt.SolidLine))
+        # for point in self.intersections_with_view_planes:
+        #     qp.drawPoint(self.plane_to_screen(point))
+        #     qp.drawText(self.plane_to_screen(point), str(np.array(point)))
 
-        qp.setPen(QPen(Qt.green, 3, Qt.SolidLine))
-        for point in self.intersections_with_sides:
-            qp.drawPoint(self.plane_to_screen(point))
-            qp.drawText(self.plane_to_screen(point), str(np.array(point)))
+        # qp.setPen(QPen(Qt.green, 3, Qt.SolidLine))
+        # for point in self.intersections_with_sides:
+        #     qp.drawPoint(self.plane_to_screen(point))
+        #     qp.drawText(self.plane_to_screen(point), str(np.array(point)))
 
     def plane_to_screen(self, v):
         xp, yp = self.front_projection(v)
@@ -264,16 +259,6 @@ class FifthTask(QWidget):
 
     def front_projection(self, v):
         return v[0], v[1]
-
-    def homog_to_screen(self, v):
-        vh = self.heal_homog(v)
-        xp, yp = vh[0], vh[1]
-        xx = round((xp - self.x1) * self.geometry().width() / (self.x2 - self.x1))
-        yy = round((yp - self.y1) * self.geometry().height() / (self.y2 - self.y1))
-        return QPoint(xx, yy)
-
-    def heal_homog(self, v):
-        return [v[0] / v[3], v[1] / v[3], v[2] / v[3], 1]
 
     def transform(self, m):
         return self.rotation_z(self.rotation_x(self.rotation_y(m)))
@@ -326,26 +311,6 @@ class FifthTask(QWidget):
             self.rotation_angle_z += 0.1
         elif event.key() == QtCore.Qt.Key_E:
             self.rotation_angle_z -= 0.1
-
-        # мне стыдно за свой код, правда :с
-        # но норм написать слишком долго
-        elif event.key() == QtCore.Qt.Key_1:
-            if 1 in self.rotate_indexes:
-                self.rotate_indexes.remove(1)
-            else:
-                self.rotate_indexes.append(1)
-
-        elif event.key() == QtCore.Qt.Key_2:
-            if 2 in self.rotate_indexes:
-                self.rotate_indexes.remove(2)
-            else:
-                self.rotate_indexes.append(2)
-
-        elif event.key() == QtCore.Qt.Key_3:
-            if 3 in self.rotate_indexes:
-                self.rotate_indexes.remove(3)
-            else:
-                self.rotate_indexes.append(3)
         else:
             return
         self.rotate()
