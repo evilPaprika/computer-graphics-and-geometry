@@ -1,6 +1,9 @@
 import math
 import numpy as np
 from itertools import combinations, chain, permutations
+from functools import reduce
+from scipy.optimize import linprog
+
 
 from PyQt5 import QtCore
 from PyQt5.QtWidgets import QWidget, QApplication
@@ -8,7 +11,7 @@ from PyQt5.QtGui import QPainter, QPen, QPolygon, QBrush, QFont, QMouseEvent
 from PyQt5.QtCore import Qt, QPoint, QRect, QLine, QTimer
 import sys
 
-np.set_printoptions(precision=5)
+np.set_printoptions(precision=1)
 
 
 class FifthTask(QWidget):
@@ -22,24 +25,60 @@ class FifthTask(QWidget):
         self.y1 = -2.5
         self.y2 = 2.5
 
-        self.square = np.array([[-2, 2, 0, 0, 0, 0],
-                                [0, 0, -0.5, 0.5, 0, 0],
-                                [0, 0, 0, 0, -0.6, 2],
-                                [1, 1, 1, 1, 1, 1], ])
+        square = [([2, 1, 1], [1, 3, 6]),
+                  ([-1, 1, 1], [1, 2, 3]),
+                  ([2, -1, 1], [3, 4, 6]),
+                  ([2, 1, -1], [1, 5, 6]),
+                  ([-1, -1, 1], [2, 3, 4]),
+                  ([-1, 1, -1], [1, 2, 5]),
+                  ([2, -1, -1], [4, 5, 6]),
+                  ([-1, -1, -1], [2, 4, 5])]
 
-        self.square2 = np.array([[1, -1, 0, 0, 0, 0],
-                                 [0, 0, 1, -1, 0, 0],
-                                 [0, 0, 0, 0, 1, -1],
-                                 [1, 1, 1, 1, 1, 1], ])
+        square2 = [([3, 1, 1], [1, 3, 6]),
+                   ([1, 1, 1], [1, 2, 3]),
+                   ([3, -1, 1], [3, 4, 6]),
+                   ([3, 1, -1], [1, 5, 6]),
+                   ([1, -1, 1], [2, 3, 4]),
+                   ([1, 1, -1], [1, 2, 5]),
+                   ([3, -1, -1], [4, 5, 6]),
+                   ([1, -1, -1], [2, 4, 5])]
 
-        self.shapes = [self.square, self.square2]
+        self.point_shapes = [square, square2]
+        self.shapes = list(map(self.from_points_to_planes, self.point_shapes))
 
-        self.rotation_angle_x = 0.7
-        self.rotation_angle_y = -1.2
+        self.rotation_angle_x = 0
+        self.rotation_angle_y = 0
         self.rotation_angle_z = 0
         self.rotate()
 
         self.init_ui()
+
+    def from_points_to_planes(self, point_shape):
+        planes = np.array(list(set(filter(lambda p: p is not None, list(
+            map(lambda p: self.get_plane_from_3_points(*p), combinations(point_shape, 3))))))).transpose()
+        centroid = np.array(reduce(lambda a, x: a + x[0], np.array(point_shape), np.zeros(3)))/len(point_shape)
+
+        return self.make_normal_vectior_point_outside(centroid, planes)
+
+    def make_normal_vectior_point_outside(self, centroid, planes):
+        result = []
+        for plane in planes.transpose():
+            if np.array(plane).dot(np.append (centroid, 1)) < 0:
+                result.append(plane * -1)
+            else:
+                result.append(plane)
+        return np.array(result).transpose()
+
+    def in_hull(self, points, x):
+        points = np.array(points)
+        x = np.array(x)
+        n_points = len(points)
+        n_dim = len(x)
+        c = np.zeros(n_points)
+        A = np.r_[points.T, np.ones((1, n_points))]
+        b = np.r_[x]
+        lp = linprog(c, A_eq=A, b_eq=b)
+        return lp.success
 
     def rotate(self):
         self.intersections_with_view_planes = []
@@ -109,10 +148,29 @@ class FifthTask(QWidget):
 
         self.visible_intersection_points = []
         self.lines_to_draw = list(chain(*map(lambda edge: self.get_line_minmax(edge), chain(*self.visible_edges))))
-        intersection_edges = list(filter(lambda line: self.is_line_visible(line),
-                                         permutations(self.visible_intersection_points, 2)))
-        self.lines_to_draw.extend(intersection_edges)
+        # intersection_edges = list(filter(lambda line: self.is_line_visible(line),
+        #                                  permutations(self.visible_intersection_points, 2)))
+        # self.lines_to_draw.extend(intersection_edges)
         self.update()
+
+    def get_plane_from_3_points(self, point1, point2, point3):
+        if not len(np.intersect1d(np.intersect1d(point1[1], point2[1]), point3[1])):
+            return None
+        x1, y1, z1 = point1[0]
+        x2, y2, z2 = point2[0]
+        x3, y3, z3 = point3[0]
+        vector1 = [x2 - x1, y2 - y1, z2 - z1]
+        vector2 = [x3 - x1, y3 - y1, z3 - z1]
+
+        cross_product = [vector1[1] * vector2[2] - vector1[2] * vector2[1],
+                         -1 * (vector1[0] * vector2[2] - vector1[2] * vector2[0]),
+                         vector1[0] * vector2[1] - vector1[1] * vector2[0]]
+
+        a = cross_product[0]
+        b = cross_product[1]
+        c = cross_product[2]
+        d = - (cross_product[0] * x1 + cross_product[1] * y1 + cross_product[2] * z1)
+        return (a / d, b / d, c / d, 1)
 
     def get_line_minmax(self, line):
         v = np.array(line[0][1]) - np.array(line[0][0])
@@ -128,15 +186,19 @@ class FifthTask(QWidget):
         return [line[0]]
 
     def is_line_visible(self, line):
+        # middle = np.append(self.get_middle_point(line), 1)
+        # for shape in self.point_shapes:
+        #     if (self.in_hull(np.array(list(map(lambda p: p[0], shape))), middle)):
+        #         return False
+        middle = np.append(self.get_middle_point(line), 1)
         for shape in self.transformed_shapes:
             planes = shape.transpose()
-            middle = np.append(self.get_middle_point(line), 1)
             dot = np.dot(planes, middle)
-            if not any(map(lambda p: p < 0.0001, dot)):
+            if not any(map(lambda p: p < 0, dot)):
                 return False
         return True
 
-    def isect_line_plane(self, p0, p1, plane, epsilon=1e-6):
+    def isect_line_plane(self, p0, p1, plane, epsilon=1):
         u = np.array(p1) - np.array(p0)
         dot = np.dot(plane[:3], u)
         plane = np.array(plane)
@@ -237,19 +299,19 @@ class FifthTask(QWidget):
         for line in self.lines_to_draw:
             qp.drawLine(self.plane_to_screen(line[0]), self.plane_to_screen(line[1]))
             # helpers
-            # qp.drawText(self.plane_to_screen(line[0]), str(np.array(line[0])))
-            # qp.drawText(self.plane_to_screen(line[1]), str(np.array(line[1])))
+            qp.drawText(self.plane_to_screen(line[0]), str(np.array(line[0])))
+            qp.drawText(self.plane_to_screen(line[1]), str(np.array(line[1])))
 
-        # # helpers
-        # qp.setPen(QPen(Qt.red, 3, Qt.SolidLine))
-        # for point in self.intersections_with_view_planes:
-        #     qp.drawPoint(self.plane_to_screen(point))
-        #     qp.drawText(self.plane_to_screen(point), str(np.array(point)))
+        # helpers
+        qp.setPen(QPen(Qt.red, 3, Qt.SolidLine))
+        for point in self.intersections_with_view_planes:
+            qp.drawPoint(self.plane_to_screen(point))
+            qp.drawText(self.plane_to_screen(point), str(np.array(point)))
 
-        # qp.setPen(QPen(Qt.green, 3, Qt.SolidLine))
-        # for point in self.intersections_with_sides:
-        #     qp.drawPoint(self.plane_to_screen(point))
-        #     qp.drawText(self.plane_to_screen(point), str(np.array(point)))
+        qp.setPen(QPen(Qt.green, 3, Qt.SolidLine))
+        for point in self.intersections_with_sides:
+            qp.drawPoint(self.plane_to_screen(point))
+            qp.drawText(self.plane_to_screen(point), str(np.array(point)))
 
     def plane_to_screen(self, v):
         xp, yp = self.front_projection(v)
